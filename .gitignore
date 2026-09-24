@@ -1,0 +1,10 @@
+node_modules/
+build/
+.venv/
+__pycache__/
+.env
+.env.*
+!.env.example
+*.pyc
+*.zip
+MANIFEST.sha256.json

@@ -1,0 +1,24 @@
+import { useState } from "react";
+import { Globe2, RefreshCw, Trash2, Plus, Mail, Clock3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Grade, issueCount, ago, nextScan, slug, ReportActions } from "./shared";
+
+export const DomainList = ({domains, onAdd, onScan, onRemove, onPreferences, busy, compact=false}) => {
+    const [grade, setGrade] = useState("all");
+    const [state, setState] = useState("all");
+    const filtered = domains.filter(d => (grade === "all" || d.last_scan?.grade === grade) && (state === "all" || (state === "active" ? d.monitoring_enabled : !d.monitoring_enabled)));
+    return <section className="dash-section" data-testid="watched-domains-section">
+        <div className="dash-section-heading"><h2><Globe2 size={17}/>Watched domains <span className="dash-count" data-testid="watched-domains-count">{domains.length}</span></h2><div className="dash-filter-row">{!compact && <><select aria-label="Filter grade" value={grade} onChange={e => setGrade(e.target.value)} data-testid="filter-grade-select"><option value="all">All grades</option>{["A+","A","B","C","D","F"].map(g => <option key={g} value={g}>{g}</option>)}</select><select aria-label="Filter monitoring status" value={state} onChange={e => setState(e.target.value)} data-testid="filter-status-select"><option value="all">All statuses</option><option value="active">Monitoring</option><option value="paused">Paused</option></select></>}<Button size="sm" variant="outline" onClick={onAdd} data-testid="add-domain-open"><Plus size={14}/> Add domain</Button></div></div>
+        {filtered.length === 0 ? <div className="dash-empty" data-testid="domains-empty"><Globe2 size={27}/><h3>{domains.length ? "No matching domains" : "Your watchlist starts here"}</h3><p>{domains.length ? "No domains match the current filters." : "No watched domains yet."}</p></div> : <div className="dash-domain-table">
+            <div className="dash-domain-heading"><span>DOMAIN</span><span>SECURITY SCORE</span><span>DAILY SCAN</span><span>EMAIL ALERTS</span><span>ACTIONS</span></div>
+            {filtered.slice(0,compact ? 4 : undefined).map(d => {const key=slug(d.domain);return <div className="dash-domain-row" key={d.id} data-testid={`domain-card-${key}`}>
+                <div className="dash-domain-name"><div className="dash-domain-symbol"><Globe2 size={18}/></div><div><strong data-testid={`domain-name-${key}`}>{d.domain}</strong><small data-testid={`domain-last-scan-${key}`}>{ago(d.last_scan?.created_at)}{d.scan_in_progress ? " · Scanning" : ""}</small>{d.last_scan_error && <small className="dash-error" data-testid={`domain-scan-error-${key}`}>{d.last_scan_error}</small>}</div></div>
+                <div className="dash-score-cell"><Grade grade={d.last_scan?.grade} testId={`domain-grade-${key}`}/><div><strong data-testid={`domain-score-${key}`}>{d.last_scan ? `${d.last_scan.score}` : "—"}<small>/100</small></strong><small data-testid={`domain-issues-${key}`}>{d.last_scan ? `${issueCount(d.last_scan)} findings` : "Awaiting baseline"}</small></div></div>
+                <div className="dash-switch-cell"><div><Switch checked={d.monitoring_enabled} disabled={busy === d.id} onCheckedChange={value => onPreferences(d,{monitoring_enabled:value})} aria-label={`Daily scans for ${d.domain}`} data-testid={`toggle-schedule-${key}`}/><span>{d.monitoring_enabled ? "Daily" : "Paused"}</span></div><small data-testid={`domain-next-scan-${key}`}><Clock3 size={11}/>{nextScan(d.next_scan_at)}</small></div>
+                <div className="dash-switch-cell"><div><Switch checked={d.email_alerts_enabled} disabled={busy === d.id} onCheckedChange={value => onPreferences(d,{email_alerts_enabled:value})} aria-label={`Grade-drop emails for ${d.domain}`} data-testid={`toggle-email-${key}`}/><span><Mail size={13}/>{d.email_alerts_enabled ? "On" : "Off"}</span></div></div>
+                <div className="dash-row-actions"><button className="dash-icon-button" title="Rescan now" aria-label={`Rescan ${d.domain}`} disabled={Boolean(busy)} onClick={() => onScan(d.domain)} data-testid={`rescan-${key}`}><RefreshCw size={15} className={busy === d.domain ? "animate-spin" : ""}/></button><ReportActions scan={d.last_scan} prefix={`domain-${key}`}/><button className="dash-icon-button danger" title="Remove domain" aria-label={`Remove ${d.domain}`} onClick={() => onRemove(d)} data-testid={`remove-${key}`}><Trash2 size={15}/></button></div>
+            </div>;})}
+        </div>}
+    </section>;
+};
