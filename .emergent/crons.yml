@@ -1,0 +1,8 @@
+crons:
+  - name: domain-token-cleanup
+    description: "Removes expired unverified domain claims nightly; keeps all previously verified domains"
+    cron: "0 2 * * *"
+    endpoint: "{{BASE_URL}}/api/cron/domain-cleanup"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    method: POST
+    enabled: true
