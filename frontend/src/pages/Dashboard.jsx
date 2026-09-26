@@ -36,8 +36,23 @@ export default function Dashboard({theme, onToggleTheme}) {
     },[]);
     useEffect(() => {if(!user) return;load();const timer=setInterval(load,30000);return () => clearInterval(timer);},[user,load]);
     useEffect(() => {setSearch("");},[current]);
-    const addDomain = async domain => {try {const {data}=await api.post("/domains",{domain});await load();setVerificationId(data.id);toast.success("Domain added — ready for ownership verification");return true;} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));return false;}};
-    const scan = async target => {if(busy) return;setBusy(target);try {const {data}=await api.post("/scan",{target,advanced:true});navigate(`/report/${data.share_id}`);} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));} finally {setBusy(null);}};
+    const addDomain = async domain => {
+        let added;
+        try {({data: added} = await api.post("/domains", {domain}));}
+        catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));return false;}
+        try {
+            const {data: report} = await api.post("/scan", {target: added.domain});
+            await load();
+            toast.success("Domain added and initial scan complete");
+            // navigate(`/report/${report.share_id}`);
+        } catch(e) {
+            await load();
+            setVerificationId(added.id);
+            toast.error(`Domain added, but the initial scan failed: ${formatApiErrorDetail(e.response?.data?.detail)}`);
+        }
+        return true;
+    };
+    const scan = async (target, advanced=true) => {if(busy) return;setBusy(target);try {const {data}=await api.post("/scan",{target,advanced});navigate(`/report/${data.share_id}`);} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));} finally {setBusy(null);}};
     const preferences = async (d, values) => {setBusy(d.id);try {await api.patch(`/domains/${d.id}`,values);await load();toast.success(values.email_alerts_enabled === true ? `Grade-drop emails enabled for ${user.email}` : "Monitoring preferences updated");} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));} finally {setBusy(null);}};
     const removeDomain = async d => {try {await api.delete(`/domains/${d.id}`);setRemove(null);await load();toast.success("Domain removed from monitoring");} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));}};
     const markRead = async id => {try {await api.patch(`/alerts/${id}/read`);setAlerts(items => items.map(a => a.id === id ? {...a,read:true} : a));} catch(e) {toast.error(formatApiErrorDetail(e.response?.data?.detail));}};
