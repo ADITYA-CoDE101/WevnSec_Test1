@@ -24,7 +24,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 from supabase import create_async_client
 
 from database import AsyncSessionLocal, engine, get_db
@@ -36,6 +36,9 @@ from domain_routes import domain_router
 from domain_cleanup import router as cleanup_router
 from domain_validation import VerificationError, normalize_domain
 from ownership import require_ownership
+from docs_routes import documentation_router
+from platform_stats import router as stats_router
+from scan_stream import emit_check, stream_scan
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -249,7 +252,7 @@ def normalize_host(target: str) -> str:
 
 
 def mk(cid, name, category, status, severity, detail, fix, t0):
-    return {
+    check = {
         "id": cid,
         "name": name,
         "category": category,
@@ -259,6 +262,8 @@ def mk(cid, name, category, status, severity, detail, fix, t0):
         "fix": fix,
         "latency_ms": max(1, round((time.perf_counter() - t0) * 1000)),
     }
+    emit_check(check)
+    return check
 
 
 def _tls_probe(host):
@@ -507,6 +512,19 @@ async def get_scan(share_id: str, db: AsyncSession = Depends(get_db)):
     return serialize_scan(scan)
 
 
+@api_router.post('/scan/stream')
+async def live_scan(body: ScanIn, user=Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    try:
+        host = normalize_domain(body.target)
+    except VerificationError as exc:
+        raise HTTPException(400, detail={'reason': exc.reason, 'message': exc.message})
+    user_id = user['id'] if user else None
+    if body.advanced:
+        await require_ownership(db, user_id, host)
+    return StreamingResponse(stream_scan(host, user_id, body.advanced, run_scan, serialize_scan),
+        media_type='application/x-ndjson', headers={'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no'})
+
+
 @api_router.get("/scans/history")
 async def scan_history(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -529,6 +547,8 @@ async def download_scan_pdf(share_id: str, db: AsyncSession = Depends(get_db)):
 
 api_router.include_router(domain_router(get_current_user, serialize_scan))
 api_router.include_router(cleanup_router)
+api_router.include_router(documentation_router(get_current_user))
+api_router.include_router(stats_router)
 
 class DomainPreferences(BaseModel):
     monitoring_enabled: bool | None = None
@@ -584,18 +604,6 @@ async def account_email(user_id):
 
 
 monitor = MonitoringWorker(run_scan, account_email)
-
-
-@api_router.get("/stats")
-async def stats(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(text("""
-        SELECT count(*) AS scans,
-               COALESCE(SUM((counts->>'critical')::int + (counts->>'high')::int
-                          + (counts->>'medium')::int + (counts->>'low')::int), 0) AS vulns
-        FROM wevnsec.scans
-    """))
-    row = result.one()
-    return {"scans": row.scans, "vulns": int(row.vulns)}
 
 
 @api_router.get("/")

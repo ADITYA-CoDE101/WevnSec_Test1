@@ -108,3 +108,26 @@ class CronDelivery(Base):
     deleted_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     finished_at = Column(DateTime(timezone=True))
+
+
+class Documentation(Base):
+    __tablename__ = 'documentation'
+    __table_args__ = {'schema': 'wevnsec'}
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    slug = Column(String(120), unique=True, nullable=False)
+    title = Column(String(180), nullable=False)
+    summary = Column(Text, nullable=False)
+    category = Column(String(80), nullable=False)
+    severity = Column(String(16), nullable=False)
+    coverage = Column(String(24), nullable=False)
+    check_ids = Column(JSONB, nullable=False, default=list)
+    explanation = Column(Text, nullable=False)
+    impact = Column(Text, nullable=False)
+    mitigation = Column(Text, nullable=False)
+    validation = Column(Text, nullable=False)
+    limitations = Column(Text, nullable=False)
+    reference_url = Column(Text, nullable=False, default='')
+    published = Column(Boolean, nullable=False, default=False)
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)

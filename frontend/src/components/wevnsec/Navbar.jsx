@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const LINKS = [
     { label: "Product", hash: "#how-it-works" },
-    { label: "Docs", hash: "#docs" },
+    { label: "Docs", route: "/docs" },
     { label: "Pricing", hash: "#pricing" },
     { label: "Changelog", route: "/changelog" },
 ];

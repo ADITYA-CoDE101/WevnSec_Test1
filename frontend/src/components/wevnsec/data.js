@@ -1,26 +1,9 @@
-export const CHECKS = [
-    { id: "CHK-01", name: "TLS Certificate & Cipher Suite", category: "SSL/TLS", status: "PASS", latency: "14ms", details: "TLS 1.3 enforced, HSTS preload active (31536000s)" },
-    { id: "CHK-02", name: "HTTP Security Headers", category: "HEADERS", status: "WARN", latency: "38ms", details: "CSP missing report-uri; X-Frame-Options set to SAMEORIGIN" },
-    { id: "CHK-03", name: "Reflected DOM & Stored XSS Surfaces", category: "XSS", status: "PASS", latency: "112ms", details: "No dangerous innerHTML sinks across 43 analyzed scripts" },
-    { id: "CHK-04", name: "Exposed Secrets & .env Probes", category: "ENV_LEAK", status: "FAIL", latency: "22ms", details: "Public access to /.env.production detected (AWS_KEY leak alert)" },
-    { id: "CHK-05", name: "CORS Misconfiguration & Origin Reflection", category: "CORS", status: "PASS", latency: "19ms", details: "Access-Control-Allow-Origin strictly whitelist validated" },
-    { id: "CHK-06", name: "DNSSEC & Subdomain Takeover Vectors", category: "DNS", status: "PASS", latency: "45ms", details: "Zone valid; no orphaned CNAME to dangling S3/GitHub pages" },
-];
-
 export const SAMPLE_DOMAINS = ["example.com", "github.com", "stripe.com"];
 
 export const MARQUEE_ITEMS = [
-    "OWASP TOP 10", "CVE FEED · LIVE", "TLS 1.3 ENFORCED", "crt.sh MONITOR",
-    "SOC2 READY", "ZERO-DAY WATCH", "HSTS PRELOAD", "SUBDOMAIN GUARD",
-    "CSP AUDIT", "JWT HARDENING", "27 VULN CLASSES", "CREST VETTED",
-];
-
-export const LOGOS = [
-    { name: "FINTECH_SERIES_B", badge: "SOC2 TYPE II" },
-    { name: "DEV_INFRA_UNIFIED", badge: "ISO 27001" },
-    { name: "HEALTH_API_GATEWAY", badge: "HIPAA" },
-    { name: "NEOBANK_CORE", badge: "PCI-DSS 4.0" },
-    { name: "IDENTITY_VAULT_LABS", badge: "GDPR AUDITED" },
+    "TLS & CERTIFICATES", "HTTP SECURITY HEADERS", "OWNERSHIP VERIFICATION", "CORS OBSERVATIONS",
+    "COOKIE FLAGS", "MITIGATION GUIDANCE", "HSTS HEADER CHECK", "PUBLIC SCAN REPORTS",
+    "CSP HEADER CHECK", "REFERENCE LIBRARY", "REAL SCAN RESULTS", "SCOPED MANUAL REVIEW",
 ];
 
 export const STEPS = [
@@ -28,23 +11,23 @@ export const STEPS = [
         step: "01",
         title: "Instant Scan",
         lead: "Non-invasive passive recon in seconds",
-        description: "Zero install. Enter your public URL to probe open ports, cryptographic hygiene, exposed config secrets, and outdated dependencies.",
-        badge: "30 Seconds",
-        code: 'curl -X POST https://api.wevnsec.dev/v1/scan \\\n  -d \'{"target": "https://yourapp.com"}\'',
+        description: "Enter a public domain to check TLS, root-response security headers, HTTPS redirects, cookie flags, and CORS behavior.",
+        badge: "No install",
+        code: 'POST /api/scan\n{"target": "example.com", "advanced": false}',
     },
     {
         step: "02",
         title: "Verified Deep Scan",
-        lead: "Authenticated attack surface validation",
-        description: "Confirm ownership via DNS TXT or meta-tag to unlock active fuzzing, an authenticated route crawler, and API endpoint stress checks.",
+        lead: "Ownership-gated configuration checks",
+        description: "Verify your apex domain to unlock sensitive-path probes and scheduled scans. Findings include context and remediation guidance.",
         badge: "DNS Verified",
-        code: "TXT  _wevnsec-verify=wn_9f82d1c5a9b\nValidating record across 12 edge nodes...",
+        code: "TXT on your apex domain\nwevnsec-verify=<your verification token>",
     },
     {
         step: "03",
         title: "Human Pentest Report",
-        lead: "Manual exploitation triage by certified engineers",
-        description: "Machine precision meets human intuition. Certified researchers hunt logic flaws, broken auth, and IDOR issues with clear remediation snippets.",
+        lead: "Request a separately scoped assessment",
+        description: "Discuss application-specific logic, authorization, and authenticated flows that a public automated scan cannot assess.",
         badge: "Audit Ready",
         code: "REPORT #WN-8821\nHIGH [CVSS 8.2] — BOLA in /api/v2/workspace/export\nRemediation diff provided.",
     },
@@ -53,39 +36,39 @@ export const STEPS = [
 export const GRID = [
     {
         category: "OWASP A01:2021",
-        title: "Broken Access Control",
-        description: "Checks for IDOR, unauthenticated admin routes, CORS misconfigurations, and role leakage across REST & GraphQL endpoints.",
-        items: ["Direct Object References", "Privilege Escalation", "CORS Origin Reflection", "API Route Bypasses"],
+        title: "Cross-Origin Configuration",
+        description: "Observes root-endpoint CORS behavior. Application-specific authorization flaws such as IDOR require a separate review.",
+        items: ["Origin Reflection", "Wildcard Observations", "Response Headers", "Context-Aware Guidance"],
     },
     {
         category: "OWASP A02:2021",
         title: "Cryptographic Failures",
-        description: "Validates TLS 1.3 negotiation, deprecated cipher suites, HSTS preloading, and certificate expiration alerts.",
-        items: ["TLS 1.0/1.1 Deprecation", "Weak Cipher Detection", "HSTS Header Preload", "Cert Chain Validation"],
+        description: "Checks certificate trust and expiry, the negotiated TLS version, HTTPS availability, and root HTTP redirects.",
+        items: ["Negotiated TLS Version", "Certificate Expiry", "HTTPS Availability", "HTTP Redirects"],
     },
     {
         category: "OWASP A03:2021",
-        title: "Injection & XSS Surfaces",
-        description: "Detects DOM injection sinks, reflected query parameters, unescaped payload templates, and legacy script imports.",
-        items: ["Reflected & DOM XSS", "SQLi & NoSQL Injection", "Template Injection", "Prototype Pollution"],
+        title: "Browser Defense Headers",
+        description: "Checks for CSP, framing protection, and MIME-sniffing headers. Their presence does not prove that injection vulnerabilities are absent.",
+        items: ["CSP Header Presence", "X-Frame-Options", "Content-Type Protection", "Documented Limitations"],
     },
     {
         category: "OWASP A05:2021",
         title: "Security Misconfiguration",
-        description: "Scans for publicly accessible .env files, debug stack traces, open git repositories, and directory listings.",
-        items: ["Exposed .env & .git", "Verbose Stack Traces", "Default Credentials", "Missing Security Headers"],
+        description: "Ownership-gated advanced scans probe a bounded set of sensitive paths and flag possible exposure for manual confirmation.",
+        items: [".env Path Probes", ".git Path Probes", "Configuration Paths", "Catch-All Baseline"],
     },
     {
         category: "OWASP A06:2021",
-        title: "Vulnerable Dependencies",
-        description: "Inventories client-side packages against live CVE databases (NVD, GitHub Advisories) with upgrade paths.",
-        items: ["Known CVEs in Bundles", "Outdated Frameworks", "Deprecation Warnings", "Supply Chain Alerts"],
+        title: "Privacy & Information Exposure",
+        description: "Observes referrer and permissions-policy headers alongside server banners that may disclose implementation details.",
+        items: ["Referrer-Policy", "Permissions-Policy", "Server Banners", "X-Powered-By"],
     },
     {
         category: "OWASP A07:2021",
         title: "Auth & Session Flaws",
-        description: "Tests cookie flags, JWT signature algorithms, login rate-limiting, and session invalidation behavior.",
-        items: ["Missing Cookie Flags", "JWT 'None' Algorithm", "Missing Rate Limiting", "Session Fixation"],
+        description: "Inspects cookies set by the public root response. Login behavior and authenticated session handling need application-specific testing.",
+        items: ["Secure Attribute", "HttpOnly Attribute", "SameSite Attribute", "Public-Response Scope"],
     },
 ];
 
@@ -93,14 +76,14 @@ export const VERIFY_METHODS = [
     {
         type: "DNS TXT Record",
         tag: "Recommended for APIs & multi-domain",
-        code: "Host:  _wevnsec-verification.yourdomain.com\nType:  TXT\nValue: wn-site-token-7e8b91a320c",
-        latency: "Propagates in ~60 seconds",
+        code: "Host:  @ (your apex domain)\nType:  TXT\nValue: wevnsec-verify=<your generated token>",
+        latency: "DNS propagation time varies",
     },
     {
         type: "HTML Meta Tag",
-        tag: "Fastest for SPAs & Next.js",
-        code: '<meta name="wevnsec-verify"\n      content="wn-site-token-7e8b91a320c" />',
-        latency: "Instant crawl verification",
+        tag: "For server-rendered root HTML",
+        code: '<meta name="wevnsec-verification"\n      content="<your generated token>" />',
+        latency: "Checked when you select Verify now",
     },
 ];
 
@@ -206,9 +189,3 @@ export const FAQS = [
     },
 ];
 
-export const INITIAL_STATS = {
-    scanned: 1428914,
-    vulns: 89240,
-    avgTime: 28.4,
-    researchers: 180,
-};

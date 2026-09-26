@@ -38,6 +38,7 @@ dist
 
 *token.json*
 *credentials.json*
+tests/.tmp_*_state.json
 
 # Logs and debug files
 npm-debug.log*
@@ -88,3 +89,4 @@ android-sdk/
 # overlay black-box crash/user-report dumps — session data, never history
 **/.emergent/recordings/
 frontend/node_modules/.cache/default-development/3.pack
+frontend/node_modules/.cache/default-development/8.pack

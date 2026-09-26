@@ -140,3 +140,54 @@ Phase 6: Manual QA against a real domain (all 4 methods) + edge cases (409, time
 3. Revisit optional support/email enhancements only after user feedback.
 
 Implementation/API/runbook: `docs/DOMAIN_VERIFICATION.md`.
+
+---
+
+## Follow-up: stable live scan panel, honest counters, editable documentation
+
+### Original follow-up request (visual edits)
+**Terminal, div line 69:** "this just a , plan showcase and its shorting and streching making the rest of the content up and down, add something meaningful here, something good visually"
+
+**TrustBar, div line 72:** "these numerical values are misleading , we are just getting started so , just put the real numbers , and make it dinamisclly change as user do scan , this will give lots of number in runtime , add number of vulnravilties we are  addressing,  we wiil also add the documentation page which wiill contain all the explanation of almost  all the weakness and vulnerability and there mitigation for users to have references on vulnerability found on the scans and this documentaion numbers will be significant , you can add the doc page too. if there anythiing you want to add more you can do it ."
+
+### Confirmed follow-up choices
+- Fixed-size scan preview, explicitly labeled example while idle; actual activity/findings during a real scan without surrounding layout movement.
+- Real completed scan totals and recorded findings, with repeated observations accurately labeled.
+- Documentation for current scanner checks AND broader vulnerability education, clearly distinguished from automated detection.
+- Additional requirement: "make it so that an admin can add/edit/remove any documentation or explanation on the docs".
+
+### Architecture additions
+- Keep existing React design, FastAPI, Supabase/PostgreSQL and authentication.
+- Request-scoped `POST /api/scan/stream` NDJSON stream: actual start and check-return events, complete event only after the real report is persisted. Existing nonstreaming scan API retained. Advanced stream uses existing ownership gate; disconnected requests cancel their task. No fabricated progress percentages.
+- Console dimensions are stable per breakpoint (520px desktop, 540px mobile); only the inner results scroll. Removed auto-cycling typing/tilt/showcase behavior.
+- `/api/stats` uses one database snapshot: saved assessments, fail+warn observations (repeat findings included), separate fail/warn aliases, published articles, and check-type count from the implemented catalog. No invented baselines, random increments, fictitious researchers or trust-logo claims.
+- Frontend revalidates stats after scan completion, on focus, and every 15 seconds while visible; failures display unavailable/stale states rather than invented values.
+- Implemented check catalog contains 14 diagnostic output IDs. This does not imply that every scan executes all 14 or that these are 14 confirmed vulnerabilities.
+- `wevnsec.documentation` stores structured plain-text articles, slug, category, reference severity, automated/educational coverage, supported check IDs, publication state, timestamps and optimistic version.
+- Migration `f1a5b7c9d014` creates/seeds docs once, with RLS and direct browser-write restrictions. Profile-role writes are restricted so users cannot self-promote through Supabase table access.
+- Public `GET /api/docs`, `/api/docs/catalog`, `/api/docs/{slug}` expose only published content. Admin GET/POST/PUT/DELETE under `/api/admin/docs`, authorized by server-loaded profile role. Duplicate slug and stale-version conflicts use 409; reserved slugs and inconsistent coverage are rejected.
+- Documentation routes: `/docs`, `/docs/:slug`, `/docs/manage`, `/docs/manage/new`, `/docs/manage/:id`. Each significant view has its own route. Report checks link to their currently published guidance.
+
+### Implemented — 2026-09-26 follow-up
+- Replaced changing-height terminal with fixed-size scan activity view, truthful idle example, live returned checks, filter tabs, actual duration and full-report link; real scan stays on the landing page until the user opens its report.
+- Replaced fabricated TrustBar values and randomized increases with live database aggregates, explicit repeat-counting definitions, retry control and update timestamp.
+- Removed invented trust-logo strip, unused fake initial stats, and unsupported automated capability claims in the affected hero/marquee/check-summary content.
+- Added 22 substantive published reference articles: 14 covering implemented scanner diagnostics and 8 educational-only topics. Explanations, impact, remediation, validation and known detector limitations are included. Educational topics explicitly say they are not automatically detected.
+- Added searchable/filterable responsive documentation library, individual reference pages, related report links, actual Docs navigation/footer/preview links, and an admin entry point.
+- Added admin draft/create/edit/publish/unpublish/delete UI; supported-check picker; all article fields editable; validation/errors, duplicate slug conflict, optimistic version protection, save/loading and delete confirmation states.
+- Existing Instant/Verified scan separation, domain verification, monitoring, and manual pentest request preserved.
+- Migration applied; frontend lint passed with one pre-existing unused constant warning; production build passed.
+
+### Follow-up verification evidence
+- Main screenshot verified a real Instant Scan and the console retaining exactly 520px height across idle/filter/complete states; docs search/filter/detail loaded.
+- Testing agent iteration 3: 14/14 backend regression tests passed for actual streamed reports, stats parity/increments, admin CRUD/validation and permissions. Public UI and reported layout bug verified at desktop/tablet and 320/390px mobile with stable heights/no overflow. Full report links and related docs passed.
+- Testing agent iteration 4: full ADMIN BROWSER CRUD passed using a legitimate disposable Supabase account, provisioned admin only for that exact test UUID. Normal UI sign-in and `/auth/me` role confirmed. Draft privacy/counts, publishing, coverage picker, edits/version persistence, unpublish/republish, duplicate URL error, delete cancel/confirm and final public 404/count restoration verified. Disposable data/account cleaned up.
+- Production APIs/integrations are real. Idle example records are clearly illustrative and never contribute to statistics. No customer accounts or original article rows were modified by admin tests.
+- Evidence: `/app/test_reports/iteration_3.json`, `/app/test_reports/iteration_4.json`, `/app/test_reports/pytest/pytest_results_iteration_3.xml`; regression suite `backend/tests/test_docs_stats_stream_regression.py`.
+
+### Follow-up remaining work and next actions
+- No known outstanding application defects in the tested new flows.
+- **Access note:** the supplied `.env` admin password does not match the pre-existing Supabase admin account. The existing account/password was deliberately NOT reset. Use the account's current password; an authorized password reset/sync requires user approval. This is separate from the successfully tested admin functionality.
+- P1 optional: article revision history/restore to supplement optimistic version conflict checks.
+- P2 optional: editorial review workflow, article tags, and richer formatting if requested.
+- Original controlled-domain live verification QA and token-bound CNAME enhancement remain deferred as documented above.
