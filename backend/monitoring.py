@@ -67,7 +67,7 @@ class MonitoringWorker:
         async with AsyncSessionLocal() as db:
             now = utcnow()
             domain = (await db.execute(select(Domain).where(
-                Domain.monitoring_enabled.is_(True), Domain.next_scan_at <= now,
+                Domain.monitoring_enabled.is_(True), Domain.verified.is_(True), Domain.next_scan_at <= now,
                 or_(Domain.scan_lock_until.is_(None), Domain.scan_lock_until < now)
             ).order_by(Domain.next_scan_at).limit(1).with_for_update(skip_locked=True))).scalar_one_or_none()
             if not domain:

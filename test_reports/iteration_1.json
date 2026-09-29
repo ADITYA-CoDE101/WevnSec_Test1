@@ -1,0 +1,47 @@
+{
+  "summary": "Completed backend+frontend regression for WevnSec domain verification and related scan/cron/auth flows on external URL. All 23 backend tests passed; core UI/login/verification tabs/manual pentest CTA validated.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Landing navbar at 320px viewport",
+        "issues": [
+          "Top navigation text overlaps/compresses (Product/Docs/Pricing/Changelog/Sign in), indicating responsive overflow at smallest mobile width."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_domain_verification_regression.py",
+    "/app/backend/tests/test_verification_unit_controls.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix landing navbar responsive overlap at 320px width.",
+    "Populate /app/memory/test_credentials.md with canonical credentials for future agents.",
+    "Run controlled-domain QA for live successful DNS/HTTP verification methods when a controllable domain is available."
+  ],
+  "critical_code_review_comments": [
+    "Auth test credential registry file (/app/memory/test_credentials.md) is present but empty; this breaks the mandated credential handoff flow and increases auth test fragility.",
+    "No direct backend functional regressions found in tested verification/ownership/cron paths."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_domain_verification_regression.py",
+    "/app/backend/tests/test_verification_unit_controls.py",
+    "/app/test_reports/iteration_1.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "88%"
+  },
+  "seed_data_creation": "Created only disposable QA-tagged domains/users during tests and removed them; also removed prior disposable wevnsec-ui-check-20260926.com and temporary punycode test row.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "External origin allowlist behavior revalidated: trusted rewritten preview Origin succeeds on POST /api/auth/login, untrusted Origin returns 403. Backend regression suite includes API+DB cron idempotency and isolated state-machine tests with monkeypatched proof handlers. Live successful DNS/HTTP ownership proof remains unverified due lack of controllable domain.",
+  "rca of the issue": "Responsive issue RCA: at 320px, header layout keeps desktop nav items visible/too wide for available horizontal space, causing overlap. Mitigation: tighten mobile breakpoint behavior for nav link group and ensure only collapsed menu/actions render below md breakpoint. Also some Playwright runs showed aborted requests during rapid navigation, but final functional assertions passed."
+}

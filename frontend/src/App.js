@@ -11,6 +11,8 @@ import Report from "@/pages/Report";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Changelog from "@/pages/Changelog";
+import Documentation from "@/pages/Documentation";
+import DocumentationArticle from "@/pages/DocumentationArticle";
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -74,6 +76,8 @@ function App() {
                         <Route path="/signup" element={<Auth key="signup" mode="signup" />} />
                         <Route path="/dashboard/*" element={<Dashboard theme={theme} onToggleTheme={toggleTheme} />} />
                         <Route path="/changelog" element={<Changelog />} />
+                        <Route path="/docs" element={<Documentation />} />
+                        <Route path="/docs/:slug" element={<DocumentationArticle />} />
                     </Routes>
                     <SiteFooter />
                 </div>

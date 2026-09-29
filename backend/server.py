@@ -13,8 +13,9 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from ipaddress import ip_address
-
 import httpx
+
+
 import jwt
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -23,7 +24,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 from supabase import create_async_client
 
 from database import AsyncSessionLocal, engine, get_db
@@ -31,6 +32,13 @@ from models import Alert, Domain, Profile, Scan, utcnow
 from monitoring import MonitoringWorker, record_scan
 from pdf_report import build_pdf
 from auth_throttle import lock_attempt, failed_attempt, successful_attempt
+from domain_routes import domain_router
+from domain_cleanup import router as cleanup_router
+from domain_validation import VerificationError, normalize_domain
+from ownership import require_ownership
+from docs_routes import documentation_router
+from platform_stats import router as stats_router
+from scan_stream import emit_check, stream_scan
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -41,8 +49,10 @@ bearer = HTTPBearer(auto_error=False)
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-TRUSTED_ORIGINS = [origin.strip().rstrip('/') for origin in os.environ["CORS_ORIGINS"].split(',') if origin.strip()]
-TRUSTED_ORIGINS = list(dict.fromkeys([*TRUSTED_ORIGINS, os.environ["APP_URL"].rstrip('/')]))
+TRUSTED_ORIGINS = list(dict.fromkeys(
+    [origin.strip().rstrip('/') for origin in os.environ["CORS_ORIGINS"].split(',') if origin.strip() and origin.strip() != '*']
+    + [os.environ["APP_URL"].rstrip('/')]
+))
 if not TRUSTED_ORIGINS or any(origin == '*' or not origin.startswith(('https://', 'http://')) for origin in TRUSTED_ORIGINS):
     raise RuntimeError('CORS_ORIGINS must list explicit trusted origins')
 COOKIE_SECURE = os.environ["APP_URL"].startswith('https://')
@@ -244,7 +254,7 @@ def normalize_host(target: str) -> str:
 
 
 def mk(cid, name, category, status, severity, detail, fix, t0):
-    return {
+    check = {
         "id": cid,
         "name": name,
         "category": category,
@@ -254,6 +264,8 @@ def mk(cid, name, category, status, severity, detail, fix, t0):
         "fix": fix,
         "latency_ms": max(1, round((time.perf_counter() - t0) * 1000)),
     }
+    emit_check(check)
+    return check
 
 
 def _tls_probe(host):
@@ -292,7 +304,7 @@ async def check_tls(host):
                f"{version} enforced · {issuer} · valid for {days} more days", "", t0)]
 
 
-async def check_http(host):
+async def check_http(host, advanced=False):
     checks = []
     headers_cfg = {"User-Agent": "WevnSec-Scanner/2.4 (+https://wevnsec.dev)"}
     async with httpx.AsyncClient(timeout=7.0, follow_redirects=False, verify=False, headers=headers_cfg) as client:
@@ -385,6 +397,8 @@ async def check_http(host):
             checks.append(mk("CORS-01", "CORS origin reflection", "CORS", "warn", "low",
                              "CORS probe timed out; configuration could not be verified.", "", t5))
 
+        if not advanced:
+            return checks
         t6 = time.perf_counter()
         try:
             canary = await client.get(f"{scheme}://{host}/wevnsec-canary-{uuid.uuid4().hex[:10]}")
@@ -435,6 +449,7 @@ def compute_score(checks):
 
 class ScanIn(BaseModel):
     target: str
+    advanced: bool = False
 
 
 def serialize_scan(s: Scan, include_checks: bool = True) -> dict:
@@ -455,10 +470,17 @@ def serialize_scan(s: Scan, include_checks: bool = True) -> dict:
     return out
 
 
-async def run_scan(host, user_id=None, source="manual"):
-    host = normalize_host(host)
+async def run_scan(host, user_id=None, source="manual", advanced=False):
+    try:
+        host = normalize_domain(host)
+    except VerificationError as exc:
+        raise HTTPException(400, detail={'reason': exc.reason, 'message': exc.message})
+    advanced = advanced or source == 'scheduled'
+    if advanced:
+        async with AsyncSessionLocal() as db:
+            await require_ownership(db, user_id, host)
     started = time.perf_counter()
-    tls_checks, http_checks = await asyncio.gather(check_tls(host), check_http(host))
+    tls_checks, http_checks = await asyncio.gather(check_tls(host), check_http(host, advanced=advanced))
     checks = tls_checks + http_checks
     duration = round((time.perf_counter() - started) * 1000)
     score, grade, counts = compute_score(checks)
@@ -478,7 +500,7 @@ async def run_scan(host, user_id=None, source="manual"):
 
 @api_router.post("/scan")
 async def create_scan(body: ScanIn, user=Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
-    scan = await run_scan(body.target, user["id"] if user else None)
+    scan = await run_scan(body.target, user["id"] if user else None, advanced=body.advanced)
     await record_scan(db, scan)
     return serialize_scan(scan)
 
@@ -490,6 +512,19 @@ async def get_scan(share_id: str, db: AsyncSession = Depends(get_db)):
     if not scan:
         raise HTTPException(status_code=404, detail="Scan report not found")
     return serialize_scan(scan)
+
+
+@api_router.post('/scan/stream')
+async def live_scan(body: ScanIn, user=Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    try:
+        host = normalize_domain(body.target)
+    except VerificationError as exc:
+        raise HTTPException(400, detail={'reason': exc.reason, 'message': exc.message})
+    user_id = user['id'] if user else None
+    if body.advanced:
+        await require_ownership(db, user_id, host)
+    return StreamingResponse(stream_scan(host, user_id, body.advanced, run_scan, serialize_scan),
+        media_type='application/x-ndjson', headers={'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no'})
 
 
 @api_router.get("/scans/history")
@@ -512,63 +547,10 @@ async def download_scan_pdf(share_id: str, db: AsyncSession = Depends(get_db)):
     })
 
 
-class DomainIn(BaseModel):
-    domain: str
-
-
-@api_router.post("/domains")
-async def save_domain(body: DomainIn, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    host = normalize_host(body.domain)
-    db.add(Domain(user_id=user["id"], domain=host))
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-    return {"domain": host}
-
-
-@api_router.get("/domains")
-async def list_domains(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Domain).where(Domain.user_id == user["id"]).order_by(Domain.domain)
-    )
-    out = []
-    for d in result.scalars().all():
-        last = await db.execute(
-            select(Scan)
-            .where(Scan.user_id == user["id"], Scan.target == d.domain)
-            .order_by(Scan.created_at.desc())
-            .limit(1)
-        )
-        scan = last.scalar_one_or_none()
-        out.append({
-            "id": d.id,
-            "domain": d.domain,
-            "verified": d.verified,
-            "monitoring_enabled": d.monitoring_enabled,
-            "email_alerts_enabled": d.email_alerts_enabled,
-            "next_scan_at": d.next_scan_at.isoformat() if d.monitoring_enabled and d.next_scan_at else None,
-            "last_scheduled_at": d.last_scheduled_at.isoformat() if d.last_scheduled_at else None,
-            "scan_in_progress": bool(d.scan_lock_until and d.scan_lock_until > utcnow()),
-            "last_scan_error": d.last_scan_error,
-            "created_at": d.created_at.isoformat() if d.created_at else None,
-            "last_scan": serialize_scan(scan, include_checks=True) if scan else None,
-        })
-    return out
-
-
-@api_router.delete("/domains/{domain_id}")
-async def delete_domain(domain_id: uuid.UUID, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Domain).where(Domain.id == str(domain_id), Domain.user_id == user["id"])
-    )
-    domain = result.scalar_one_or_none()
-    if not domain:
-        raise HTTPException(status_code=404, detail="Domain not found")
-    await db.delete(domain)
-    await db.commit()
-    return {"ok": True}
-
+api_router.include_router(domain_router(get_current_user, serialize_scan))
+api_router.include_router(cleanup_router)
+api_router.include_router(documentation_router(get_current_user))
+api_router.include_router(stats_router)
 
 class DomainPreferences(BaseModel):
     monitoring_enabled: bool | None = None
@@ -582,6 +564,8 @@ async def update_domain(domain_id: uuid.UUID, body: DomainPreferences, user=Depe
     ).with_for_update())).scalar_one_or_none()
     if not domain:
         raise HTTPException(status_code=404, detail="Domain not found")
+    if body.monitoring_enabled is True and not domain.verified:
+        raise HTTPException(403, detail={'reason': 'ownership_required', 'message': 'Verify ownership before enabling advanced daily scans.'})
     if body.monitoring_enabled is not None and body.monitoring_enabled != domain.monitoring_enabled:
         domain.monitoring_enabled = body.monitoring_enabled
         domain.next_scan_at = utcnow() if body.monitoring_enabled else None
@@ -624,18 +608,6 @@ async def account_email(user_id):
 monitor = MonitoringWorker(run_scan, account_email)
 
 
-@api_router.get("/stats")
-async def stats(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(text("""
-        SELECT count(*) AS scans,
-               COALESCE(SUM((counts->>'critical')::int + (counts->>'high')::int
-                          + (counts->>'medium')::int + (counts->>'low')::int), 0) AS vulns
-        FROM wevnsec.scans
-    """))
-    row = result.one()
-    return {"scans": row.scans, "vulns": int(row.vulns)}
-
-
 @api_router.get("/")
 async def root():
     return {"message": "WevnSec API"}
@@ -643,26 +615,6 @@ async def root():
 
 # ---------- startup ----------
 
-async def ensure_auth_user(email: str, password: str, name: str, role: str, db: AsyncSession):
-    users = await supa.auth.admin.list_users()
-    existing = next((u for u in users if u.email == email), None)
-    if existing is None:
-        res = await supa.auth.admin.create_user({
-            "email": email,
-            "password": password,
-            "email_confirm": True,
-            "user_metadata": {"name": name},
-        })
-        uid = res.user.id
-    else:
-        uid = existing.id
-    profile = await db.get(Profile, uid)
-    if not profile:
-        db.add(Profile(id=uid, name=name, role=role))
-        await db.commit()
-    elif profile.role != role:
-        profile.role = role
-        await db.commit()
 
 
 @app.on_event("startup")
@@ -671,13 +623,11 @@ async def startup():
     supa = await create_async_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     anon_supa = await create_async_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     async with AsyncSessionLocal() as db:
-        await ensure_auth_user(os.environ["ADMIN_EMAIL"],
-                               os.environ["ADMIN_PASSWORD"], "Admin", "admin", db)
-        await ensure_auth_user(os.environ["DEMO_EMAIL"], os.environ["DEMO_PASSWORD"], "Demo Engineer", "user", db)
         await db.execute(text("DELETE FROM wevnsec.login_throttle WHERE updated_at < now() - interval '1 day'"))
         await db.commit()
     logger.info("WevnSec API ready (Supabase)")
     monitor.start()
+
 
 
 @app.on_event("shutdown")
@@ -694,6 +644,7 @@ async def trusted_write_origin(request: Request, call_next):
     if request.method in ('POST','PUT','PATCH','DELETE'):
         origin = request.headers.get('origin')
         if origin is not None and origin not in TRUSTED_ORIGINS:
+            logger.warning('Rejected write origin %r; configured origins %r', origin, TRUSTED_ORIGINS)
             return JSONResponse(status_code=403, content={'detail':'Origin not allowed'})
         if not origin and request.cookies.get('access_token') and not request.headers.get('authorization') and request.url.path not in ('/api/auth/login','/api/auth/register'):
             return JSONResponse(status_code=403, content={'detail':'Origin required for cookie-authenticated changes'})

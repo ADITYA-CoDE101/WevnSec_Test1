@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const LINKS = [
     { label: "Product", hash: "#how-it-works" },
-    { label: "Docs", hash: "#docs" },
+    { label: "Docs", route: "/docs" },
     { label: "Pricing", hash: "#pricing" },
     { label: "Changelog", route: "/changelog" },
 ];
@@ -67,10 +67,10 @@ export const Navbar = ({ theme, onToggleTheme }) => {
                     : "bg-transparent border-b border-transparent"
             }`}
         >
-            <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4" aria-label="Main navigation" data-testid="main-navigation">
                 <button
                     onClick={() => { setOpen(false); location.pathname !== "/" ? navigate("/") : scrollToEl("#top"); }}
-                    className="flex items-center gap-2.5"
+                    className="flex items-center gap-2.5 shrink-0"
                     aria-label="WevnSec home"
                     data-testid="nav-logo"
                 >
@@ -80,12 +80,12 @@ export const Navbar = ({ theme, onToggleTheme }) => {
                     </span>
                 </button>
 
-                <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+                <div className="hidden lg:flex items-center justify-center gap-1 mx-auto" data-testid="nav-desktop-links">
                     {LINKS.map((l) => (
                         <button
                             key={l.label}
                             onClick={() => go(l)}
-                            className="px-3.5 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent/60 transition-colors duration-200"
+                            className="px-3.5 py-2 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground rounded-md hover:bg-accent/60 transition-colors duration-200"
                             data-testid={`nav-link-${l.label.toLowerCase()}`}
                         >
                             {l.label}
@@ -93,7 +93,7 @@ export const Navbar = ({ theme, onToggleTheme }) => {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         data-testid="theme-toggle-button"
                         onClick={onToggleTheme}
@@ -129,9 +129,11 @@ export const Navbar = ({ theme, onToggleTheme }) => {
                         <ArrowRight size={14} />
                     </button>
                     <button
-                        className="md:hidden h-9 w-9 rounded-md border border-border flex items-center justify-center text-foreground"
+                        className="lg:hidden h-9 w-9 rounded-md border border-border flex items-center justify-center text-foreground"
                         onClick={() => setOpen((v) => !v)}
-                        aria-label="Open menu"
+                        aria-label={open ? "Close menu" : "Open menu"}
+                        aria-expanded={open}
+                        aria-controls="mobile-navigation"
                         data-testid="nav-mobile-menu-button"
                     >
                         {open ? <X size={16} /> : <Menu size={16} />}
@@ -146,7 +148,9 @@ export const Navbar = ({ theme, onToggleTheme }) => {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                        className="md:hidden overflow-hidden border-b border-border bg-background/95 backdrop-blur-xl"
+                        id="mobile-navigation"
+                        data-testid="nav-mobile-links"
+                        className="lg:hidden overflow-hidden border-b border-border bg-background/95 backdrop-blur-xl"
                     >
                         <div className="px-4 py-3 flex flex-col gap-1">
                             {LINKS.map((l) => (

@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowRight, Globe, Loader2 } from "lucide-react";
 import { Terminal } from "./Terminal";
 import { SAMPLE_DOMAINS } from "./data";
 import { EASE } from "./Reveal";
-import { api, formatApiErrorDetail } from "@/lib/api";
+import { liveScan } from "@/lib/liveScan";
 
 const LINES = [
     { text: "You build.", accent: false },
@@ -16,34 +15,42 @@ const LINES = [
 
 export const Hero = () => {
     const [input, setInput] = useState("");
-    const [target, setTarget] = useState("app.wevnsec.dev");
-    const [runNonce, setRunNonce] = useState(0);
+    const [session, setSession] = useState({state:"example"});
+    const requestRef = useRef(null);
     const [scanning, setScanning] = useState(false);
-    const navigate = useNavigate();
+    useEffect(() => () => requestRef.current?.abort(), []);
     const { scrollY } = useScroll();
     const glowY = useTransform(scrollY, [0, 700], [0, 160]);
     const gridY = useTransform(scrollY, [0, 700], [0, 60]);
 
     const runScan = async (domain) => {
-        if (scanning) return;
+        if (requestRef.current) return;
         const clean = (domain || input || "")
             .trim()
-            .replace(/^https?:\/\//, "")
+            .replace(/^https?:\/\//i, "")
             .replace(/\/.*$/, "");
         if (!clean) {
             toast.error("Enter a domain to scan");
             return;
         }
         setInput(clean);
-        setTarget(clean);
-        setRunNonce((n) => n + 1);
+        const controller=new AbortController();requestRef.current=controller;
+        setSession({state:"running",target:clean,checks:[]});
         setScanning(true);
         try {
-            const { data } = await api.post("/scan", { target: clean });
-            navigate(`/report/${data.share_id}`);
+            await liveScan(clean,{signal:controller.signal,onEvent:event => {
+                if(event.type==="started")setSession(s => ({...s,target:event.target}));
+                if(event.type==="check")setSession(s => ({...s,checks:[...s.checks,event.check]}));
+                if(event.type==="complete"){
+                    setSession({state:"complete",target:event.report.target,checks:event.report.checks,report:event.report});
+                    window.dispatchEvent(new Event("wevnsec:scan-completed"));
+                    toast.success("Scan saved. Your results are ready below.");
+                }
+            }});
         } catch (e) {
-            toast.error(formatApiErrorDetail(e.response?.data?.detail));
-            setScanning(false);
+            if(e.name!=="AbortError") {setSession(s => ({...s,state:"error",error:e.message}));toast.error(e.message);}
+        } finally {
+            requestRef.current=null;setScanning(false);
         }
     };
 
@@ -90,8 +97,8 @@ export const Hero = () => {
                         transition={{ duration: 0.7, delay: 0.62, ease: EASE }}
                         className="mt-6 text-lg leading-relaxed text-muted-foreground max-w-xl"
                     >
-                        WevnSec audits your site for broken access control, leaked secrets and
-                        OWASP vulnerabilities in 30 seconds — before your users find them.
+                        Check your website’s TLS, security headers, and public configuration.
+                        Understand each finding, then take the next step toward a safer site.
                     </motion.p>
 
                     <motion.form
@@ -107,6 +114,7 @@ export const Hero = () => {
                             <input
                                 data-testid="hero-url-input"
                                 value={input}
+                                disabled={scanning}
                                 onChange={(e) => setInput(e.target.value)}
                                 placeholder="yourapp.com"
                                 spellCheck={false}
@@ -146,6 +154,7 @@ export const Hero = () => {
                             <button
                                 key={d}
                                 onClick={() => runScan(d)}
+                                disabled={scanning}
                                 data-testid={`sample-domain-${d.replace(/[^a-z0-9]/gi, "-")}`}
                                 className="font-mono text-[11px] px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:text-brand hover:border-brand/50 hover:bg-brand/[0.06] transition-colors duration-200"
                             >
@@ -156,7 +165,7 @@ export const Hero = () => {
                 </div>
 
                 <div className="mt-16 max-w-3xl lg:max-w-4xl">
-                    <Terminal target={target} runNonce={runNonce} />
+                    <Terminal session={session} />
                 </div>
             </div>
         </section>

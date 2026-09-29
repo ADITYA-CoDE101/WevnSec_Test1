@@ -3,7 +3,7 @@ import { LogoMark } from "./Reveal";
 
 const COLS = [
     { title: "Product", links: ["Instant Scan", "Verified Scan", "Pentest", "Changelog"] },
-    { title: "Docs", links: ["Quickstart", "API Reference", "GitHub Action", "Vulnerability Library"] },
+    { title: "Docs", links: ["Security Reference", "Scanner Checks", "Reference-Only Topics", "TLS Guidance"] },
     { title: "Company", links: ["About", "Blog", "Careers", "Contact"] },
     { title: "Legal", links: ["Privacy", "Terms", "Responsible Disclosure", "DPA"] },
 ];
@@ -56,8 +56,8 @@ export const Footer = () => (
                             {c.links.map((l) => (
                                 <li key={l}>
                                     <a
-                                        href="#footer"
-                                        onClick={(e) => e.preventDefault()}
+                                        href={c.title==="Docs" ? ({"Security Reference":"/docs","Scanner Checks":"/docs?coverage=automated","Reference-Only Topics":"/docs?coverage=educational","TLS Guidance":"/docs/tls-certificates"}[l]) : "#footer"}
+                                        onClick={(e) => {if(c.title!=="Docs")e.preventDefault();}}
                                         data-testid={`footer-link-${l.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                                         className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                                     >

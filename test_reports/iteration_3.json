@@ -1,0 +1,49 @@
+{
+  "summary": "Completed backend+frontend verification for live scan stream, stats accuracy, docs library behavior, and admin/public authorization gates on the external preview URL. Added focused regression pytest suite (14 tests, all passed) and validated terminal fixed-height behavior across desktop/tablet/mobile during idle/tabs/live scan. Public docs flows and report linking passed; admin UI CRUD could not be fully executed in browser because supplied admin env credentials are still rejected (known preexisting account/password mismatch).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Admin UI end-to-end edit/create/delete from /docs/manage",
+        "issue": "Blocked in browser because ADMIN_EMAIL/ADMIN_PASSWORD signin returned 'Invalid email or password' for existing admin account (known preexisting mismatch). API-level admin CRUD was still validated using disposable QA user promoted via SQL.",
+        "affected_selectors": [
+          "[data-testid='auth-email-input']",
+          "[data-testid='auth-password-input']",
+          "[data-testid='auth-submit-button']",
+          "[data-testid='auth-error']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_docs_stats_stream_regression.py",
+    "/app/test_reports/pytest/pytest_results_iteration_3.xml"
+  ],
+  "action_items": [
+    "Main agent: provision disposable admin credentials for browser-path admin UI CRUD retest (or sync env admin password with existing Supabase auth user if intended).",
+    "Re-run frontend admin manage/new/edit/delete workflow once admin signin succeeds in UI.",
+    "Keep current stream/stats/docs regression suite in CI to guard against fake counters, fake stream completion, and docs authorization regressions."
+  ],
+  "critical_code_review_comments": [
+    "Known auth-account mismatch behavior remains: ensure_auth_user() creates users when missing but does not rotate/reset password for already-existing Supabase users, which explains env ADMIN_PASSWORD not guaranteeing browser login success.",
+    "Terminal layout implementation now correctly enforces fixed outer height (520 desktop / 540 mobile) with internal results scrolling; no downstream content displacement observed during live updates."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_docs_stats_stream_regression.py",
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "90%"
+  },
+  "seed_data_creation": "Created disposable QA-prefixed users/docs/scans during tests and cleaned exact QA rows afterward (qa-docs-* users/docs and linked scans).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public docs and stats currently return 22 published articles and checks_supported=14 after cleanup. Backend regression suite validates: stream started/check/complete semantics, persisted report parity, stats increments from real scan, advanced stream 403 ownership gate, invalid-domain 400, client-cancel no fake complete event, admin docs CRUD/version/conflict/validation rules, and auth gates (401 guest/403 non-admin). Frontend verified: hero scan stays on page, full report link works, report has docs links, docs mobile no overflow at 320/390, and AdminGate blocks anonymous/non-admin users.",
+  "rca of the issue": "Admin UI E2E blockage RCA: backend startup seeding uses ensure_auth_user() that reuses an existing auth user without password reset; if existing Supabase admin account password differs from backend .env ADMIN_PASSWORD, browser login fails with 401 'Invalid email or password'. This is an account-state mismatch, not docs feature regression. Mitigation: use disposable promoted QA user for test runs (already done in backend API tests) or explicitly rotate existing admin password out-of-band before browser admin-flow validation."
+}

@@ -67,7 +67,7 @@ export default function Changelog() {
         <main className="pt-32 pb-28 min-h-screen" data-testid="changelog-page">
             <div className="max-w-3xl mx-auto px-4 sm:px-6">
                 <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">// changelog</p>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">{"// changelog"}</p>
                     <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
                         Shipped, not promised
                     </h1>

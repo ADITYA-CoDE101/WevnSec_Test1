@@ -1,0 +1,40 @@
+{
+  "summary": "Completed focused regression per request: navbar responsive patch verification on production preview plus missing critical backend verification coverage (HTTP fetcher isolation, HTML file success path, reverify lifecycle recovery, ownership gating, DNS lookup utility contracts, cron non-ASCII bearer handling, and strict input extra-field rejection).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_domain_verification_regression.py",
+    "/app/backend/tests/test_verification_unit_controls.py",
+    "/app/backend/tests/test_verification_http_fetcher.py",
+    "/app/test_reports/pytest/pytest_results_iteration_2.xml",
+    "/app/test_reports/pytest/pytest_results_iteration_2_units.xml"
+  ],
+  "action_items": [
+    "Optional remaining QA only: run controlled-domain live success checks for DNS/HTTP proof methods when a domain under tester control is available (not covered here by design)."
+  ],
+  "critical_code_review_comments": [
+    "No new production code defect surfaced in tested scope; added missing isolated transport/security and state-machine regression coverage requested for verification flow hardening."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_domain_verification_regression.py",
+    "/app/backend/tests/test_verification_unit_controls.py",
+    "/app/backend/tests/test_verification_http_fetcher.py",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Created disposable QA-prefixed domains and one disposable qa-v26-owner-* auth user during regression; cleanup fixture now deletes only exact created auth users/profiles and QA domains/cron rows.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Navbar overlap issue from iteration_1 is resolved at 320/390/768/1024 with desktop links hidden below lg and mobile menu accessible. New isolated tests now cover HTTP IP pinning/Host+SNI, redirect policy boundaries, private-address blocking, oversized payload/status/timeout/unreachable mapping, DNS DoH request contract and malformed shape handling, HTML file exact-path success, verify->failed-reverify->recovery lifecycle with stable token/verified_at, ownership inheritance and spoof rejection, cron non-ASCII bearer 401 behavior, and extra=forbid API payload enforcement.",
+  "rca of the issue": "Iteration_1 navbar finding likely came from pre-patch desktop nav layout at narrow widths. Current lg-breakpoint + non-absolute nav flow prevents overlap. Missing backend risk areas were coverage gaps (not confirmed app defects): transport pinning behavior, redirect and address guards, lifecycle recovery invariants, and strict schema constraints now explicitly regression-tested."
+}
