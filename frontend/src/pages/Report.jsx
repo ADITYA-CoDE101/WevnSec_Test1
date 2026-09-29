@@ -10,6 +10,7 @@ import { api, formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { EASE } from "@/components/wevnsec/Reveal";
 import { downloadReport } from "@/lib/downloadReport";
+import useSWR from "swr";
 
 const STATUS_META = {
     pass: { icon: CheckCircle2, cls: "text-emerald-400", chip: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10", label: "PASS" },
@@ -55,6 +56,8 @@ export default function Report() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const {data:articles=[]}=useSWR("/docs",url=>api.get(url).then(r=>r.data));
+    const docsByCheck=Object.fromEntries(articles.flatMap(a=>a.check_ids.map(checkId=>[checkId,a.slug])));
     const [report, setReport] = useState(null);
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
@@ -235,6 +238,7 @@ export default function Report() {
                                             )}
                                         </div>
                                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground break-words">{c.detail}</p>
+                                        {docsByCheck[c.id] && <Link to={`/docs/${docsByCheck[c.id]}`} className="inline-flex mt-3 text-xs text-brand hover:underline" data-testid={`report-docs-${c.id.toLowerCase()}-${i}`}>Explanation, mitigation & check limitations →</Link>}
                                         {c.fix && (
                                             <div className="mt-3.5 rounded-lg border border-border bg-background overflow-hidden">
                                                 <p className="px-3.5 py-2 border-b border-border font-mono text-[10px] uppercase tracking-[0.18em] text-brand">

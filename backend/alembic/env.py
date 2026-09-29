@@ -10,7 +10,7 @@ from alembic import context
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 config = context.config
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"].replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg2://").replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
