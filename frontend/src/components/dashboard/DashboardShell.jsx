@@ -14,7 +14,7 @@ export const DashboardShell = ({user, logout, theme, onToggleTheme, alerts, stat
             <div className="dash-sidebar-bottom">
                 <div className="dash-monitor-status" data-testid="scheduler-status"><i className={status?.scheduler_running ? "is-online" : ""}/><span>{status?.scheduler_running ? "Daily monitoring active" : "Monitoring unavailable"}</span></div>
                 <Link to="/changelog" data-testid="dashboard-changelog" className="dash-nav-item"><ArrowUpRight size={16}/><span>What’s new</span></Link>
-                <Link to={user.role==="admin" ? "/docs/manage" : "/docs"} data-testid="dashboard-documentation" className="dash-nav-item"><ArrowUpRight size={16}/><span>{user.role==="admin" ? "Manage documentation" : "Security reference"}</span></Link>
+                <Link to="/docs" data-testid="dashboard-documentation" className="dash-nav-item"><ArrowUpRight size={16}/><span>Security reference</span></Link>
                 <div className="dash-user"><span className="dash-avatar">{(user.name || "W").slice(0,2).toUpperCase()}</span><div><strong>{user.name}</strong><small title={user.email} data-testid="dashboard-account-email">{user.email}</small></div><button className="dash-icon-button" onClick={logout} title="Sign out" aria-label="Sign out" data-testid="dashboard-signout-button"><LogOut size={16}/></button></div>
             </div>
         </aside>

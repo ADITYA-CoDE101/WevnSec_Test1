@@ -49,8 +49,10 @@ bearer = HTTPBearer(auto_error=False)
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-TRUSTED_ORIGINS = [origin.strip().rstrip('/') for origin in os.environ["CORS_ORIGINS"].split(',') if origin.strip() and origin.strip() != '*']
-TRUSTED_ORIGINS = list(dict.fromkeys([*TRUSTED_ORIGINS, os.environ["APP_URL"].rstrip('/'), os.environ['WEVNSEC_APP_URL'].rstrip('/'), *[origin.strip().rstrip('/') for origin in os.environ['WEVNSEC_TRUSTED_ORIGINS'].split(',') if origin.strip()]]))
+TRUSTED_ORIGINS = list(dict.fromkeys(
+    [origin.strip().rstrip('/') for origin in os.environ["CORS_ORIGINS"].split(',') if origin.strip() and origin.strip() != '*']
+    + [os.environ["APP_URL"].rstrip('/')]
+))
 if not TRUSTED_ORIGINS or any(origin == '*' or not origin.startswith(('https://', 'http://')) for origin in TRUSTED_ORIGINS):
     raise RuntimeError('CORS_ORIGINS must list explicit trusted origins')
 COOKIE_SECURE = os.environ["APP_URL"].startswith('https://')
@@ -613,26 +615,6 @@ async def root():
 
 # ---------- startup ----------
 
-async def ensure_auth_user(email: str, password: str, name: str, role: str, db: AsyncSession):
-    users = await supa.auth.admin.list_users()
-    existing = next((u for u in users if u.email == email), None)
-    if existing is None:
-        res = await supa.auth.admin.create_user({
-            "email": email,
-            "password": password,
-            "email_confirm": True,
-            "user_metadata": {"name": name},
-        })
-        uid = res.user.id
-    else:
-        uid = existing.id
-    profile = await db.get(Profile, uid)
-    if not profile:
-        db.add(Profile(id=uid, name=name, role=role))
-        await db.commit()
-    elif profile.role != role:
-        profile.role = role
-        await db.commit()
 
 
 @app.on_event("startup")
@@ -641,13 +623,11 @@ async def startup():
     supa = await create_async_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     anon_supa = await create_async_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     async with AsyncSessionLocal() as db:
-        await ensure_auth_user(os.environ["ADMIN_EMAIL"],
-                               os.environ["ADMIN_PASSWORD"], "Admin", "admin", db)
-        await ensure_auth_user(os.environ["DEMO_EMAIL"], os.environ["DEMO_PASSWORD"], "Demo Engineer", "user", db)
         await db.execute(text("DELETE FROM wevnsec.login_throttle WHERE updated_at < now() - interval '1 day'"))
         await db.commit()
     logger.info("WevnSec API ready (Supabase)")
     monitor.start()
+
 
 
 @app.on_event("shutdown")
